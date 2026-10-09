@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Warehouse Swarm</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0c13;color:#e0e0e0;font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+header{background:#12151f;padding:8px 16px;border-bottom:1px solid #1e2235;display:flex;align-items:center;gap:12px;flex-shrink:0;height:44px}
+header h1{font-size:14px;color:#7c9fff;font-weight:700;white-space:nowrap}
+#dot{width:8px;height:8px;border-radius:50%;background:#333;transition:background .3s;flex-shrink:0}
+#dot.on{background:#4CAF50;box-shadow:0 0 5px #4CAF50}
+.hdr-leg{display:flex;gap:10px;font-size:11px;color:#9ea8b5}
+.hleg{display:flex;align-items:center;gap:4px}
+.lsq{width:9px;height:9px;border-radius:2px}
+#tlbl{font-size:12px;color:#7c9fff;margin-left:auto;font-weight:600;white-space:nowrap}
+.main{display:flex;flex:1;overflow:hidden}
+#wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#070910;position:relative}
+canvas{cursor:crosshair}
+aside{width:310px;background:#12151f;border-left:1px solid #1e2235;display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+
+/* Panels */
+.panel{border-bottom:1px solid #1e2235}
+.panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;user-select:none;background:#12151f;position:sticky;top:0;z-index:1}
+.panel-hdr h3{font-size:10px;color:#7c9fff;letter-spacing:1.2px;text-transform:uppercase;font-weight:700}
+.panel-hdr .tog{font-size:12px;color:#555;transition:transform .2s}
+.panel-hdr.open .tog{transform:rotate(90deg)}
+.panel-body{padding:10px 12px;display:none}
+.panel-body.open{display:block}
+
+/* Controls */
+.btn{padding:6px 10px;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;transition:opacity .15s;color:#fff;white-space:nowrap}
+.btn:hover{opacity:.8} .btn.act{outline:2px solid #fff}
+.g{background:#4CAF50}.y{background:#FF9800}.r{background:#f44336}.b{background:#2196F3}
+.gr{background:#263040;color:#9ea8b5}.pu{background:#7B1FA2}.tl{background:#00796B}
+.row{display:flex;gap:5px;margin-bottom:6px;align-items:center}
+.row:last-child{margin-bottom:0}
+select,input[type=number]{background:#0a0c13;color:#e0e0e0;border:1px solid #1e2235;border-radius:4px;padding:3px 6px;font-size:11px}
+.sl{font-size:11px;color:#9ea8b5;min-height:14px;margin-top:3px}
+
+/* Metric rows */
+.mr{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid #1e223530}
+.mv{font-weight:700;color:#7c9fff}
+
+/* Task Assignment */
+.ta-row{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #1e223530;font-size:11px}
+.ta-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ta-badge{padding:1px 5px;border-radius:3px;font-size:10px;font-weight:700}
+.ph-pick{background:#1B5E20;color:#69F0AE}
+.ph-drop{background:#E65100;color:#FFCCBC}
+.ph-idle{background:#263040;color:#78909C}
+.ta-bar{flex:1;height:4px;background:#1e2235;border-radius:2px;overflow:hidden}
+.ta-fill{height:100%;border-radius:2px;transition:width .3s}
+
+/* Conflict cards */
+.cf-card{background:#1a1200;border:1px solid #3d2800;border-radius:6px;padding:7px;margin-bottom:5px;font-size:11px}
+.cf-head{display:flex;justify-content:space-between;margin-bottom:4px}
+.cf-robots{color:#FFD740;font-weight:700}
+.cf-type{color:#FF8F00;font-size:10px}
+.cf-bar{height:4px;background:#3d2800;border-radius:2px;overflow:hidden;margin-top:4px}
+.cf-fill{height:100%;background:#FF6D00;border-radius:2px}
+
+/* Hive mind */
+.hm-item{display:flex;gap:6px;padding:4px 0;border-bottom:1px solid #1e223530;font-size:11px}
+.hm-bar{width:3px;border-radius:1px;flex-shrink:0}
+.hm-msg{color:#b0b8c8;line-height:1.3}
+.hm-tick{color:#555;font-size:10px;white-space:nowrap}
+.c-yield{background:#FF8F00}
+.c-detour{background:#1976D2}
+.c-pickup{background:#2E7D32}
+.c-delivery{background:#E65100}
+.c-auction{background:#6A1B9A}
+.c-restock{background:#00796B}
+.c-fail{background:#C62828}
+
+/* Station list */
+.st-row{display:flex;align-items:center;gap:5px;padding:4px 0;border-bottom:1px solid #1e223530;font-size:11px}
+.st-inv{flex:1;height:5px;background:#1e2235;border-radius:2px;overflow:hidden}
+.st-fill-pick{background:#1de9b6}
+.st-fill-drop{background:#ff6e40}
+.st-pri{display:flex;gap:2px}
+.pri-btn{width:18px;height:14px;border:none;border-radius:2px;cursor:pointer;font-size:9px;font-weight:700;background:#1e2235;color:#555;transition:all .15s}
+.pri-btn.on{color:#fff}
+.pri-1.on{background:#2E7D32}
+.pri-2.on{background:#F57F17}
+.pri-3.on{background:#B71C1C}
+
+/* Perf */
+.perf-bar{height:6px;background:#1e2235;border-radius:3px;overflow:hidden;margin-top:4px}
+.perf-fill{height:100%;background:#7c9fff;border-radius:3px;transition:width .5s}
+</style>
+</head>
+<body>
+
+<header>
+  <div id="dot"></div>
+  <h1>⚡ Warehouse Swarm Coordinator</h1>
+  <div class="hdr-leg">
+    <span class="hleg"><span class="lsq" style="background:#1de9b6"></span>Pick</span>
+    <span class="hleg"><span class="lsq" style="background:#ff6e40"></span>Drop</span>
+    <span class="hleg"><span class="lsq" style="background:#2d3140"></span>Shelf</span>
+    <span class="hleg"><span class="lsq" style="background:#ffd740;border-radius:50%"></span>Conflict</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-left:12px">
+    <button class="btn tl" id="btn-heat" onclick="toggleHeat()">🌡 Heatmap</button>
+    <button class="btn gr"  id="btn-targ" onclick="toggleTargetLines()">🎯 Routes</button>
+  </div>
+  <span id="tlbl">Tick 0</span>
+</header>
+
+<div class="main">
+<div id="wrap"><canvas id="c"></canvas></div>
+
+<aside>
+
+<!-- MAP CONFIG -->
+<div class="panel">
+  <div class="panel-hdr open" onclick="tog(this)">
+    <h3>Map &amp; Config</h3><span class="tog">▶</span></div>
+  <div class="panel-body open">
+    <div class="row">
+      <select id="msel" style="flex:1"></select>
+    </div>
+    <div class="row">
+      <div style="flex:1">
+        <div style="font-size:10px;color:#9ea8b5;margin-bottom:2px">Robots</div>
+        <input type="number" id="nrobots" value="5" min="1" max="50" style="width:100%">
+      </div>
+      <div style="flex:1;margin-left:4px">
+        <div style="font-size:10px;color:#9ea8b5;margin-bottom:2px">Capacity/robot</div>
+        <input type="number" id="rcap" value="1" min="1" max="5" style="width:100%">
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn pu" onclick="downloadMap()" style="flex:1">⬇ Download</button>
+      <button class="btn b" onclick="switchMap()" style="flex:1">Load Map</button>
+    </div>
+    <div class="sl" id="map-st"></div>
+    <div style="border-top:1px solid #1e2235;margin:8px 0 6px"></div>
+    <div class="row">
+      <button class="btn g" style="flex:1" onclick="api('/control/start','POST')">▶ Start</button>
+      <button class="btn y" style="flex:1" onclick="api('/control/pause','POST')">⏸ Pause</button>
+      <button class="btn gr" style="flex:1" onclick="api('/control/reset','POST')">↺ Reset</button>
+    </div>
+    <div class="row">
+      <button class="btn r" id="bblock" onclick="toggleBlock()" style="flex:1">🚧 Block Mode</button>
+    </div>
+    <div class="row">
+      <select id="psel" style="flex:1">
+        <option value="1">p1 — Normal</option>
+        <option value="2">p2 — High</option>
+        <option value="3">p3 — Urgent</option>
+      </select>
+      <select id="qsel" style="width:52px">
+        <option value="1">×1</option>
+        <option value="2">×2</option>
+        <option value="3">×3</option>
+      </select>
+      <button class="btn b" onclick="addOrder()">+Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- METRICS -->
+<div class="panel">
+  <div class="panel-hdr open" onclick="tog(this)">
+    <h3>Metrics</h3><span class="tog">▶</span></div>
+  <div class="panel-body open">
+    <div class="mr"><span>Tick</span><span class="mv" id="mt">0</span></div>
+    <div class="mr"><span>Tasks done</span><span class="mv" id="md">0</span></div>
+    <div class="mr"><span>Moving</span><span class="mv" id="ma">0</span></div>
+    <div class="mr"><span>Idle</span><span class="mv" id="mi">0</span></div>
+    <div class="mr"><span>Failed</span><span class="mv" id="mf">0</span></div>
+  </div>
+</div>
+
+<!-- TASK ASSIGNMENTS -->
+<div class="panel">
+  <div class="panel-hdr open" onclick="tog(this)">
+    <h3>Task Assignments</h3><span class="tog">▶</span></div>
+  <div class="panel-body open" id="task-panel"></div>
+</div>
+
+<!-- STATIONS -->
+<div class="panel">
+  <div class="panel-hdr open" onclick="tog(this)">
+    <h3>Stations (click priority)</h3><span class="tog">▶</span></div>
+  <div class="panel-body open" id="station-panel"></div>
+</div>
+
+<!-- CONFLICTS -->
+<div class="panel">
+  <div class="panel-hdr open" onclick="tog(this)">
+    <h3>Conflict Predictions</h3><span class="tog">▶</span></div>
+  <div class="panel-body open" id="conflict-panel">
+    <span style="font-size:11px;color:#555">No conflicts predicted</span>
+  </div>
+</div>
+
+<!-- HIVE MIND -->
+<div class="panel">
+  <div class="panel-hdr open" onclick="tog(this)">
+    <h3>Hive Mind Feed</h3><span class="tog">▶</span></div>
+  <div class="panel-body open" id="hive-panel"
+       style="max-height:180px;overflow-y:auto"></div>
+</div>
+
+<!-- PERFORMANCE -->
+<div class="panel">
+  <div class="panel-hdr open" onclick="tog(this)">
+    <h3>Performance</h3><span class="tog">▶</span></div>
+  <div class="panel-body open" id="perf-panel">
+    <div class="mr"><span>Tasks/100 ticks</span><span class="mv" id="p-t100">0</span></div>
+    <div class="mr"><span>Avg delivery</span><span class="mv" id="p-avd">0 ticks</span></div>
+    <div class="mr"><span>Conflicts resolved</span><span class="mv" id="p-cf">0</span></div>
+    <div class="mr"><span>Route adaptations</span><span class="mv" id="p-rp">0</span></div>
+    <div class="mr"><span>Total deliveries</span><span class="mv" id="p-td">0</span></div>
+    <div style="margin-top:8px;font-size:10px;color:#9ea8b5;margin-bottom:3px">Fleet efficiency</div>
+    <div class="perf-bar"><div class="perf-fill" id="eff-bar" style="width:0%"></div></div>
+  </div>
+</div>
+
+</aside>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+let G=null, robots=[], stations=[], hive=[], conflicts=[], perf={};
+let heatmap=[], heatOn=false, routeOn=true, blockMode=false;
+let CELL=20;
+
+// Panel toggle
+function tog(hdr){
+  hdr.classList.toggle('open');
+  const body = hdr.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+// WebSocket
+let ws;
+function connect(){
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${protocol}//${location.host}/ws`);
+  ws.onmessage = e => {
+    try {
+      const d = JSON.parse(e.data);
+      if(d.grid){ G=d.grid; resize(); }
+      robots=d.robots||[]; stations=d.stations||[];
+      hive=d.hive_mind||[]; conflicts=d.conflicts||[];
+      perf=d.performance||{};
+      if(d.heatmap&&d.heatmap.length) heatmap=d.heatmap;
+      updateUI(d); draw();
+    } catch(err) {
+      console.error(err);
+    }
+  };
+  ws.onclose=()=>setTimeout(connect,1500);
+}
+connect();
+
+// Map selector
+const BENCH=['warehouse-10-20-10-2-1','warehouse-10-20-10-2-2',
+             'warehouse-20-40-10-2-1','maze-32-32-2','random-32-32-10','empty-32-32'];
+async function refreshMaps(){
+  try {
+    const r=await fetch('/map/available'); const {maps}=await r.json();
+    const all=[...new Set(['custom',...(maps||[]),...BENCH])];
+    const sel=document.getElementById('msel');
+    const curVal=sel.value;
+    sel.innerHTML=all.map(m=>`<option value="${m}">${m==='custom'?'Custom Warehouse':m}</option>`).join('');
+    if(curVal&&all.includes(curVal)) sel.value=curVal;
+  } catch(e) {
+    console.error(e);
+  }
+}
+refreshMaps();
+
+async function downloadMap(){
+  const n=document.getElementById('msel').value;
+  if(n==='custom'){setSt('Custom map needs no download','#7c9fff');return;}
+  setSt('Downloading…','#FF9800');
+  try {
+    const r=await fetch(`/map/download/${n}`,{method:'POST'});
+    const d=await r.json();
+    d.ok ? setSt('Downloaded ✓','#4CAF50') : setSt('Error: '+d.error,'#f44336');
+    refreshMaps();
+  } catch(e) {
+    setSt('Error: '+e.message,'#f44336');
+  }
+}
+async function switchMap(){
+  const n=document.getElementById('msel').value;
+  const nr=+document.getElementById('nrobots').value||5;
+  const cap=+document.getElementById('rcap').value||1;
+  setSt('Loading…','#FF9800');
+  await api('/control/pause','POST');
+  try {
+    const r=await fetch('/map/switch',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({map_name:n,num_robots:nr,robot_capacity:cap})});
+    const d=await r.json();
+    d.ok ? setSt(`${n} loaded (${nr} robots ×${cap}cap)`,'#4CAF50')
+         : setSt('Error: '+d.error,'#f44336');
+  } catch(e) {
+    setSt('Error: '+e.message,'#f44336');
+  }
+}
+function setSt(m,c){const el=document.getElementById('map-st');el.textContent=m;el.style.color=c;}
+
+// Canvas resize
+function resize(){
+  if(!G) return;
+  const wrap = document.getElementById('wrap');
+  CELL=Math.min(
+    Math.floor((wrap.clientWidth-32)/G.width),
+    Math.floor((wrap.clientHeight-32)/G.height), 34);
+  CELL=Math.max(CELL,5);
+  canvas.width=G.width*CELL; canvas.height=G.height*CELL;
+  draw();
+}
+window.addEventListener('resize',resize);
+
+// ── Drawing ────────────────────────────────────────────────────────
+function draw(){
+  if(!G) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Grid
+  for(let y=0;y<G.height;y++) for(let x=0;x<G.width;x++){
+    ctx.fillStyle = G.cells[y][x]===1 ? '#1e2235' : '#0d1020';
+    ctx.fillRect(x*CELL,y*CELL,CELL,CELL);
+    if(CELL>8){ ctx.strokeStyle='#0a0c1388'; ctx.lineWidth=.3; ctx.strokeRect(x*CELL,y*CELL,CELL,CELL); }
+  }
+
+  // Heatmap overlay
+  if(heatOn && heatmap.length){
+    heatmap.forEach(h=>{
+      ctx.fillStyle=`rgba(255,60,0,${h.v*0.55})`;
+      ctx.fillRect(h.x*CELL,h.y*CELL,CELL,CELL);
+    });
+  }
+
+  // Conflict highlights
+  conflicts.forEach(cf=>{
+    const x=cf.cell[0],y=cf.cell[1];
+    const alpha = cf.confidence * 0.7;
+    ctx.fillStyle=`rgba(255,200,0,${alpha})`;
+    ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2);
+  });
+
+  // Stations (draw before robots)
+  drawStations();
+
+  // Route lines (robot → target)
+  if(routeOn) drawRouteLines();
+
+  // Planned paths (dashed)
+  robots.forEach(r=>{
+    if(!r.path||r.path.length<2) return;
+    ctx.beginPath(); ctx.strokeStyle=r.color+'44';
+    ctx.lineWidth=1.2; ctx.setLineDash([3,4]);
+    ctx.moveTo(r.path[0][0]*CELL+CELL/2, r.path[0][1]*CELL+CELL/2);
+    r.path.slice(1).forEach(([px,py])=>ctx.lineTo(px*CELL+CELL/2,py*CELL+CELL/2));
+    ctx.stroke(); ctx.setLineDash([]);
+  });
+
+  // Robots
+  drawRobots();
+}
+
+function drawStations(){
+  (G.pick_stations||[]).forEach(([px,py])=>{
+    const st=stations.find(s=>s.x===px&&s.y===py&&s.type==='pick');
+    ctx.fillStyle='#1de9b6';
+    ctx.fillRect(px*CELL+1,py*CELL+1,CELL-2,CELL-2);
+    if(CELL>12){
+      // Inventory badge
+      ctx.fillStyle='#003d30'; ctx.font=`bold ${Math.max(CELL*.35,8)}px monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(st?st.current:'?', px*CELL+CELL/2, py*CELL+CELL/2);
+      // Priority ring if >1
+      if(st&&st.priority>1){
+        ctx.strokeStyle=st.priority===3?'#ff1744':'#FF9800';
+        ctx.lineWidth=2; ctx.beginPath();
+        ctx.rect(px*CELL+1,py*CELL+1,CELL-2,CELL-2);
+        ctx.stroke();
+      }
+    }
+  });
+  (G.drop_stations||[]).forEach(([dx,dy])=>{
+    const st=stations.find(s=>s.x===dx&&s.y===dy&&s.type==='drop');
+    ctx.fillStyle='#ff6e40';
+    ctx.fillRect(dx*CELL+1,dy*CELL+1,CELL-2,CELL-2);
+    if(CELL>12){
+      ctx.fillStyle='#3e1000'; ctx.font=`bold ${Math.max(CELL*.35,8)}px monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(st?st.current:'?', dx*CELL+CELL/2, dy*CELL+CELL/2);
+    }
+  });
+}
+
+function drawRouteLines(){
+  robots.forEach(r=>{
+    if(!r.target||r.state==='idle'||r.state==='failed') return;
+    const sx=r.x*CELL+CELL/2, sy=r.y*CELL+CELL/2;
+    const tx=r.target[0]*CELL+CELL/2, ty=r.target[1]*CELL+CELL/2;
+    ctx.beginPath();
+    ctx.strokeStyle = r.phase==='pickup' ? '#ffffff33' : r.color+'66';
+    ctx.lineWidth=1.5;
+    ctx.setLineDash(r.phase==='pickup'?[4,4]:[]);
+    ctx.moveTo(sx,sy); ctx.lineTo(tx,ty); ctx.stroke();
+    ctx.setLineDash([]);
+    // Arrow at target
+    const angle = Math.atan2(ty-sy,tx-sx);
+    const as=8;
+    ctx.beginPath();
+    ctx.fillStyle = r.phase==='pickup' ? '#ffffff55' : r.color+'99';
+    ctx.moveTo(tx,ty);
+    ctx.lineTo(tx-as*Math.cos(angle-0.4),ty-as*Math.sin(angle-0.4));
+    ctx.lineTo(tx-as*Math.cos(angle+0.4),ty-as*Math.sin(angle+0.4));
+    ctx.closePath(); ctx.fill();
+    // Target pulse ring
+    ctx.beginPath(); ctx.strokeStyle=r.color+'88'; ctx.lineWidth=1.5;
+    ctx.arc(tx,ty,CELL*.45,0,Math.PI*2); ctx.stroke();
+  });
+}
+
+function drawRobots(){
+  robots.forEach(r=>{
+    const cx=r.x*CELL+CELL/2, cy=r.y*CELL+CELL/2;
+    const rad=Math.max(CELL*.36,3);
+
+    // Outer phase ring
+    if(r.state!=='failed'&&r.phase){
+      ctx.beginPath();
+      ctx.arc(cx,cy,rad+2.5,0,Math.PI*2);
+      ctx.fillStyle = r.phase==='pickup' ? '#ffffff22' : r.color+'44';
+      ctx.fill();
+      ctx.strokeStyle = r.phase==='pickup' ? '#ffffff55' : r.color;
+      ctx.lineWidth=1.5; ctx.stroke();
+    }
+
+    // Robot body
+    ctx.beginPath(); ctx.arc(cx,cy,rad,0,Math.PI*2);
+    ctx.fillStyle = r.state==='failed' ? '#2a2a2a' :
+                    r.state==='waiting' ? r.color+'88' : r.color;
+    ctx.fill();
+
+    // ID
+    if(CELL>10){
+      ctx.fillStyle='#fff'; ctx.font=`bold ${Math.max(CELL*.36,8)}px monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(r.id,cx,cy);
+    }
+
+    // Carrying badge
+    if(r.carrying>0&&CELL>12){
+      ctx.fillStyle='#ffd740';
+      ctx.beginPath(); ctx.arc(cx+rad*.7,cy-rad*.7,3,0,Math.PI*2); ctx.fill();
+      if(r.carrying>1){
+        ctx.fillStyle='#000'; ctx.font=`bold 8px monospace`;
+        ctx.fillText(r.carrying,cx+rad*.7,cy-rad*.7);
+      }
+    }
+
+    // Failed X
+    if(r.state==='failed'&&CELL>10){
+      ctx.strokeStyle='#f44336'; ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx-3,cy-3); ctx.lineTo(cx+3,cy+3);
+      ctx.moveTo(cx+3,cy-3); ctx.lineTo(cx-3,cy+3);
+      ctx.stroke();
+    }
+
+    // Phase label (small)
+    if(r.phase&&CELL>18){
+      ctx.fillStyle = r.phase==='pickup'?'#69F0AE':'#FFAB76';
+      ctx.font=`bold 7px sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.fillText(r.phase==='pickup'?'PK':'DR', cx, cy+rad+1);
+    }
+  });
+}
+
+// ── UI Updates ─────────────────────────────────────────────────────
+function updateUI(d){
+  document.getElementById('dot').className    = d.running?'on':'';
+  document.getElementById('tlbl').textContent = `Tick ${d.tick}`;
+  document.getElementById('mt').textContent   = d.tick;
+  document.getElementById('md').textContent   = d.metrics.throughput;
+  document.getElementById('ma').textContent   = d.metrics.active;
+  document.getElementById('mi').textContent   = d.metrics.idle;
+  document.getElementById('mf').textContent   = d.metrics.failed;
+
+  updateTaskPanel();
+  updateStationPanel();
+  updateConflicts();
+  updateHive();
+  updatePerf(d);
+}
+
+function updateTaskPanel(){
+  const p=document.getElementById('task-panel');
+  if(!robots.length){p.innerHTML='<span style="font-size:11px;color:#555">No robots</span>';return;}
+  p.innerHTML=robots.map(r=>{
+    const phase = r.phase || 'idle';
+    const badgeCls = phase==='pickup'?'ph-pick':phase==='dropoff'?'ph-drop':'ph-idle';
+    const badgeTxt = phase==='pickup'?'PICKING':phase==='dropoff'?'DROPPING':'IDLE';
+    const target   = r.target ? `(${r.target[0]},${r.target[1]})` : '—';
+    const carry    = r.carrying>0 ? `📦×${r.carrying}` : '';
+    // Progress estimate: path length as proxy
+    const pathLen  = r.path?.length||0;
+    const pct      = r.state==='idle'?0 : Math.max(5, 100-pathLen*8);
+    return `<div class="ta-row">
+      <div class="ta-dot" style="background:${r.state==='failed'?'#555':r.color}"></div>
+      <span style="font-weight:700;min-width:20px">R${r.id}</span>
+      <span class="ta-badge ${badgeCls}">${badgeTxt}</span>
+      <span style="color:#9ea8b5;flex:1;text-align:right">${target} ${carry}</span>
+    </div>
+    <div style="margin:-2px 0 4px 14px">
+      <div class="ta-bar"><div class="ta-fill" style="width:${pct}%;background:${r.color}77"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function updateStationPanel(){
+  const p=document.getElementById('station-panel');
+  if(!stations.length){p.innerHTML='';return;}
+  p.innerHTML=stations.map(s=>{
+    const cls=s.type==='pick'?'st-fill-pick':'st-fill-drop';
+    const label=s.type==='pick'?`P(${s.x},${s.y})`:`D(${s.x},${s.y})`;
+    const priBtns=[1,2,3].map(p=>
+      `<button class="pri-btn pri-${p} ${s.priority===p?'on':''}"
+        onclick="setStationPri(${s.id},${p})">${p}</button>`).join('');
+    return `<div class="st-row">
+      <span style="font-size:10px;color:#9ea8b5;min-width:64px">${label}</span>
+      <div class="st-inv"><div class="${cls}" style="height:100%;width:${s.pct}%;transition:width .3s"></div></div>
+      <span style="font-size:10px;color:#7c9fff;min-width:32px;text-align:right">${s.current}/${s.max}</span>
+      ${s.type==='pick'?`<div class="st-pri">${priBtns}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function updateConflicts(){
+  const p=document.getElementById('conflict-panel');
+  if(!conflicts.length){
+    p.innerHTML='<span style="font-size:11px;color:#555">No conflicts predicted ✓</span>';
+    return;
+  }
+  p.innerHTML=conflicts.map(cf=>`
+    <div class="cf-card">
+      <div class="cf-head">
+        <span class="cf-robots">R${cf.robot_a} ↔ R${cf.robot_b}</span>
+        <span class="cf-type">${cf.type} · ${cf.ticks_away}t away</span>
+      </div>
+      <div>Cell (${cf.cell[0]},${cf.cell[1]}) · confidence ${Math.round(cf.confidence*100)}%</div>
+      <div class="cf-bar"><div class="cf-fill" style="width:${cf.confidence*100}%"></div></div>
+    </div>`).join('');
+}
+
+const HIVE_COLORS={yield:'c-yield',detour:'c-detour',pickup:'c-pickup',
+                   delivery:'c-delivery',auction:'c-auction',restock:'c-restock',fail:'c-fail'};
+function updateHive(){
+  const p=document.getElementById('hive-panel');
+  if(!hive.length){p.innerHTML='<span style="font-size:11px;color:#555">Waiting for activity…</span>';return;}
+  p.innerHTML=hive.map(m=>`
+    <div class="hm-item">
+      <div class="hm-bar ${HIVE_COLORS[m.type]||'c-detour'}"></div>
+      <span class="hm-msg">${m.msg}</span>
+    </div>`).join('');
+}
+
+function updatePerf(d){
+  if(!perf) return;
+  document.getElementById('p-t100').textContent = perf.throughput_100||0;
+  document.getElementById('p-avd').textContent  = (perf.avg_delivery||0)+' ticks';
+  document.getElementById('p-cf').textContent   = perf.conflicts||0;
+  document.getElementById('p-rp').textContent   = perf.replans||0;
+  document.getElementById('p-td').textContent   = perf.total_deliveries||0;
+  const eff = d.metrics.throughput>0
+    ? Math.min(100, Math.round(d.metrics.active/(robots.filter(r=>r.state!=='failed').length||1)*100))
+    : 0;
+  document.getElementById('eff-bar').style.width=eff+'%';
+}
+
+// ── Interactions ───────────────────────────────────────────────────
+canvas.addEventListener('click',e=>{
+  if(!blockMode||!G) return;
+  const r=canvas.getBoundingClientRect();
+  api('/event/block','POST',{
+    x:Math.floor((e.clientX-r.left)/CELL),
+    y:Math.floor((e.clientY-r.top)/CELL)});
+});
+
+function toggleBlock(){
+  blockMode=!blockMode;
+  document.getElementById('bblock').classList.toggle('act',blockMode);
+  canvas.style.cursor=blockMode?'cell':'crosshair';
+}
+function toggleHeat(){
+  heatOn=!heatOn;
+  document.getElementById('btn-heat').classList.toggle('act',heatOn);
+  draw();
+}
+function toggleTargetLines(){
+  routeOn=!routeOn;
+  document.getElementById('btn-targ').classList.toggle('act',routeOn);
+  draw();
+}
+
+function addOrder(){
+  const p=+document.getElementById('psel').value;
+  const q=+document.getElementById('qsel').value;
+  api('/event/order','POST',{priority:p,qty:q});
+}
+
+async function setStationPri(sid,pri){
+  await fetch(`/station/${sid}/priority`,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({priority:pri})});
+}
+
+function api(url,method='POST',body=null){
+  return fetch(url,{method,headers:{'Content-Type':'application/json'},
+    body:body?JSON.stringify(body):null});
+}
+</script>
+</body>
+</html>
